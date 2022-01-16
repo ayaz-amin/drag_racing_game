@@ -67,21 +67,25 @@ void init_player(vehicle_t* player)
     player->m_drag_coefficient = 0.5f * player->m_friction_coefficient * player->m_frontal_area * AIR_DENSITY;
     player->m_rolling_resistance_coefficient = 0.01f;
 
-    init_engine(&player->m_engine);
-    player->m_engine_torque = player->m_engine.m_torque_curve[0];
-    player->m_engine_rpm = 1000.0f;
+    player->m_engine_hp = 450.0f;
+    player->m_min_rpm = 900.0f;
+    player->m_max_rpm = 7000.0f;
+    player->m_engine_rpm = player->m_min_rpm;
+    player->m_instant_torque = (player->m_engine_hp * 5252) / player->m_engine_rpm;
+    player->m_engine_torque = player->m_engine_torque;
+    player->m_differential = 3.75f;
+
+    player->m_top_speed = top_speed(
+        AIR_DENSITY, player->m_drag_coefficient,
+        player->m_frontal_area, player->m_rolling_resistance_coefficient,
+        player->m_mass, 9.81f, player->m_engine_hp
+    );
 
     player->m_wheel_radius = 0.33f;
 
     player->m_braking_force = -5000.0f;
     player->m_acceleration = 0.0f;
     player->m_velocity = 0.0f;
-
-    // player->m_top_speed = top_speed(
-    //     AIR_DENSITY, player->m_drag_coefficient,
-    //     player->m_frontal_area, player->m_rolling_resistance_coefficient,
-    //     player->m_mass, 9.81f, player->m_engine_hp
-    // );
 
     player->m_position_x = 0.0f;
     player->m_position_y = 0.0f;
@@ -107,46 +111,46 @@ void update_garage(vehicle_t* vehicle)
     update_button(&g_back_button, g_mouse_pos);
     if(g_back_button.m_is_pressed) g_ui_state = MENU_STATE;
     vehicle->m_drag_coefficient = 0.5f * vehicle->m_friction_coefficient * vehicle->m_frontal_area * AIR_DENSITY;
-    // vehicle->m_engine_torque = (vehicle->m_engine_hp * 5252) / vehicle->m_max_rpm;
+    vehicle->m_engine_torque = (vehicle->m_engine_hp * 5252) / vehicle->m_max_rpm;
     // vehicle->m_top_speed = cbrt(
     //     (2 * vehicle->m_engine_hp * 745.7f) / (AIR_DENSITY * vehicle->m_drag_coefficient * vehicle->m_frontal_area)
     //     );
 
-    // vehicle->m_top_speed = top_speed(
-    //     AIR_DENSITY, vehicle->m_drag_coefficient,
-    //     vehicle->m_frontal_area, vehicle->m_rolling_resistance_coefficient,
-    //     vehicle->m_mass, 9.81f, vehicle->m_engine_hp
-    // );
+    vehicle->m_top_speed = top_speed(
+        AIR_DENSITY, vehicle->m_drag_coefficient,
+        vehicle->m_frontal_area, vehicle->m_rolling_resistance_coefficient,
+        vehicle->m_mass, 9.81f, vehicle->m_engine_hp
+    );
 }
 
 bool imgui_window_close = false;
 
 void draw_garage(vehicle_t* vehicle)
 {
-//     DrawTexture(g_garage_tex, 0, 0, WHITE);
-//     DrawTextureRec(
-//         vehicle->m_texture, {0.0f, 0.0f, vehicle->m_texture.width / 5, vehicle->m_texture.height},
-//         {
-//             0.5 * WINDOW_WIDTH - 0.1 * vehicle->m_texture.width,
-//             0.75 * WINDOW_HEIGHT - 0.5 * vehicle->m_texture.height
-//         },
-//         WHITE
-//     );
-//     button_render(&g_back_button);
+    DrawTexture(g_garage_tex, 0, 0, WHITE);
+    DrawTextureRec(
+        vehicle->m_texture, {0.0f, 0.0f, vehicle->m_texture.width / 5, vehicle->m_texture.height},
+        {
+            0.5 * WINDOW_WIDTH - 0.1 * vehicle->m_texture.width,
+            0.75 * WINDOW_HEIGHT - 0.5 * vehicle->m_texture.height
+        },
+        WHITE
+    );
+    button_render(&g_back_button);
 
-//     BeginRLImGui();
-//     ImGui::Begin("Vehicle editor", &imgui_window_close, ImGuiWindowFlags_MenuBar);
+    BeginRLImGui();
+    ImGui::Begin("Vehicle editor", &imgui_window_close, ImGuiWindowFlags_MenuBar);
         
-//         ImGui::SliderFloat("Vehicle mass", &vehicle->m_mass, 500.0f, 2000.0f);
-//         ImGui::SliderFloat("Coefficient of friction", &vehicle->m_friction_coefficient, 0.15f, 1.0f);
-//         ImGui::SliderFloat("Frontal Area", &vehicle->m_frontal_area, 1.0f, 3.0f);
-//         ImGui::SliderFloat("Engine Horsepower", &vehicle->m_engine_hp, 200.0f, 1500.0f);
-//         ImGui::SliderFloat("Wheel radius", &vehicle->m_wheel_radius, 0.1f, 1.0f);
-//         ImGui::Text("Theoretical top speed (kph): %f", vehicle->m_top_speed * 3.6);
-//         ImGui::Text("Theoretical top speed (mph): %f", vehicle->m_top_speed * 2.237);
+        ImGui::SliderFloat("Vehicle mass", &vehicle->m_mass, 500.0f, 2000.0f);
+        ImGui::SliderFloat("Coefficient of friction", &vehicle->m_friction_coefficient, 0.15f, 1.0f);
+        ImGui::SliderFloat("Frontal Area", &vehicle->m_frontal_area, 1.0f, 3.0f);
+        ImGui::SliderFloat("Engine Horsepower", &vehicle->m_engine_hp, 200.0f, 1500.0f);
+        ImGui::SliderFloat("Wheel radius", &vehicle->m_wheel_radius, 0.1f, 1.0f);
+        ImGui::Text("Theoretical top speed (kph): %f", vehicle->m_top_speed * 3.6);
+        ImGui::Text("Theoretical top speed (mph): %f", vehicle->m_top_speed * 2.237);
     
-//     ImGui::End();
-//     EndRLImGui();
+    ImGui::End();
+    EndRLImGui();
 }
 
 void update_race(vehicle_t* player, vehicle_t* opponent)
@@ -155,10 +159,8 @@ void update_race(vehicle_t* player, vehicle_t* opponent)
 
     if(IsKeyDown(KEY_UP))
     {
-        update_vehicle(player);
-
         player->m_traction = (
-            (player->m_engine_torque * player->m_engine.m_gear_ratios[player->m_engine.m_current_gear] * player->m_engine.m_differential * 0.7f) / player->m_wheel_radius
+            (player->m_engine_torque * player->m_differential * 0.7f) / player->m_wheel_radius
         );
     } else if(IsKeyDown(KEY_DOWN)) {
         player->m_traction = player->m_braking_force;
@@ -179,24 +181,22 @@ void update_race(vehicle_t* player, vehicle_t* opponent)
     if(player->m_velocity <= 0) player->m_velocity = 0.0f;
     // if(player->m_velocity > player->m_top_speed) player->m_velocity = player->m_top_speed;
 
-    player->m_engine_rpm = (player->m_velocity / player->m_wheel_radius) * player->m_engine.m_gear_ratios[player->m_engine.m_current_gear] * player->m_engine.m_differential * 9.549296585513; // 60 / (2 pi)
+    player->m_engine_rpm = (player->m_velocity / player->m_wheel_radius) * player->m_differential * 9.549296585513; // 60 / (2 pi)
 
-    // if(player->m_engine_rpm > player->m_max_rpm)
-    // {
-    //     player->m_engine_rpm = player->m_max_rpm;
-    // } else 
-    if(player->m_engine_rpm < 1000.0f) {
-        player->m_engine_rpm = 1000.0f;
+    if(player->m_engine_rpm <= player->m_min_rpm) {
+        player->m_engine_torque = player->m_instant_torque;
+    } else if(player->m_engine_rpm > player->m_min_rpm && player->m_engine_rpm <= player->m_max_rpm) {
+        player->m_engine_torque = (player->m_engine_hp * 5252) / player->m_engine_rpm;
+    } else if(player->m_engine_rpm > player->m_max_rpm) {
+        player->m_engine_rpm = player->m_max_rpm;
     }
 
     player->m_position_x += player->m_velocity * FIXED_DELTA_TIME;
 
     // Update opponent vehicle
 
-    update_vehicle(opponent);
-
     opponent->m_traction = (
-        (opponent->m_engine_torque * opponent->m_engine.m_gear_ratios[opponent->m_engine.m_current_gear] * opponent->m_engine.m_differential * 0.7f) / opponent->m_wheel_radius
+        (opponent->m_engine_torque * opponent->m_differential * 0.7f) / opponent->m_wheel_radius
     );
 
     opponent->m_drag = -opponent->m_drag_coefficient * opponent->m_velocity * abs(opponent->m_velocity);
@@ -212,13 +212,19 @@ void update_race(vehicle_t* player, vehicle_t* opponent)
     if(opponent->m_velocity <= 0) opponent->m_velocity = 0.0f;
 
     opponent->m_engine_rpm = (
-        (opponent->m_velocity / opponent->m_wheel_radius) * opponent->m_engine.m_gear_ratios[opponent->m_engine.m_current_gear] * opponent->m_engine.m_differential * 60
+        (opponent->m_velocity / opponent->m_wheel_radius) * opponent->m_differential * 60
     ) / (6.283185);
 
-    if(opponent->m_engine_rpm < 1000.0f)
+    if(opponent->m_engine_rpm <= opponent->m_min_rpm)
     {
-        opponent->m_engine_rpm = 1000.0f;
+        opponent->m_engine_torque = opponent->m_instant_torque;
+    } else if(opponent->m_engine_rpm > opponent->m_min_rpm && opponent->m_engine_rpm <= opponent->m_max_rpm) {
+        opponent->m_engine_torque = (opponent->m_engine_hp * 5252) / opponent->m_engine_rpm;
+    } else if(opponent->m_engine_rpm > opponent->m_max_rpm) {
+        opponent->m_engine_rpm = opponent->m_max_rpm;
     }
+
+    opponent->m_engine_torque = (opponent->m_engine_hp * 5252) / opponent->m_engine_rpm;
 
     opponent->m_position_x += opponent->m_velocity * FIXED_DELTA_TIME;
 
@@ -343,9 +349,15 @@ void run_app()
     opponent.m_drag_coefficient = 0.5f * opponent.m_friction_coefficient * opponent.m_frontal_area * AIR_DENSITY;
     opponent.m_rolling_resistance_coefficient = 0.01f;
 
-    init_engine(&opponent.m_engine);
-    opponent.m_engine_torque = opponent.m_engine.m_torque_curve[0];
-    opponent.m_engine_rpm = 1000.0f;
+    opponent.m_engine_hp = 397.0f;
+    opponent.m_min_rpm = 900.0f;
+    opponent.m_max_rpm = 6900.0f;
+    opponent.m_engine_rpm = opponent.m_min_rpm;
+    opponent.m_instant_torque = (opponent.m_engine_hp * 5252) / opponent.m_engine_rpm;
+    opponent.m_engine_torque = opponent.m_instant_torque;
+    opponent.m_differential = 3.55f;
+
+    opponent.m_wheel_radius = 0.33f;
 
     opponent.m_braking_force = -4000.0f;
     opponent.m_acceleration = 0.0f;
