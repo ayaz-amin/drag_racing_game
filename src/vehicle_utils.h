@@ -27,15 +27,14 @@ typedef struct
 
     float m_engine_hp;
     float m_min_rpm;
-    float m_max_rpm;
+    float m_cross_over;
+    float m_max_torque;
     float m_engine_rpm;
-    float m_instant_torque;
     float m_engine_torque;
-    float m_differential;
-
-    float m_top_speed;
 
     float m_wheel_radius;
+    float m_top_speed;
+    float m_differential;
 
     // Movement
     
